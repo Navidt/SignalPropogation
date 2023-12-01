@@ -333,7 +333,6 @@ class aoa_sensor_1d:
             self.svd_roll[chanspec] = 0
 
         num_meas = H.shape[2]
-        print("shape:", H.shape)
         c_roll = self.svd_roll[chanspec]
         for n in range(num_meas):
             self.svd_window[chanspec][c_roll, :, :] = H[:,:,n].T @ H[:,:,n].conj()

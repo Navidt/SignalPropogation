@@ -223,7 +223,6 @@ class aoa_node:
 
                 if len(prof.shape) == 3:
                     prof = prof[:,:,self.prof_tx_id]
-<<<<<<< HEAD
                 if self.use_color:
                     profim = (self.accept_color(prof/np.max(prof))[:,:,:3] * 255).astype(np.uint8)
                     peak_idx = int((self._theta_range.shape[0]-1)*(self.last_aoa - self._theta_range[0])/(self._theta_range[-1] - self._theta_range[0]))
@@ -236,13 +235,6 @@ class aoa_node:
                     im_msg = io_utils.image_message(profim, msg.header.stamp, 'mono8')
                     self._prof_pub.publish(im_msg)
             else:
-=======
-
-                prof_im = self.draw_prof_image(prof)
-                im_msg = io_utils.image_message(prof_im, msg.header.stamp, 'rgb8')
-                self._prof_pub.publish(im_msg)
-            else: 
->>>>>>> f4fc3c10ad1554aa6c050cf575ef1b66d8161be4
                 profim = io_utils.draw_1d_profile(prof, self._theta_range)
                 im_msg = io_utils.image_message(profim, msg.header.stamp, 'rgb8')
                 self._prof_pub.publish(im_msg)
@@ -295,7 +287,7 @@ class aoa_node:
         ap_marker_msg.color.g = 0.6
         ap_marker_msg.color.b = 0.6
 
-        ap_marker_msg.type = Marker.MESH_RESOURCE;
+        ap_marker_msg.type = Marker.MESH_RESOURCE
         ap_marker_msg.mesh_resource = "package://csi_tools/meshes/ap_simple.stl"
         self._ap_marker_publisher.publish(ap_marker_msg)
 

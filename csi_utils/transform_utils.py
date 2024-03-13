@@ -304,7 +304,7 @@ class music_aoa_sensor_1d:
         prof = np.reciprocal(np.linalg.norm((self.Theta[chanspec] @ U_csi), axis=1) + eps)**2
         return self.theta_space[np.argmax(prof)], prof
     
-    def run(self, H, chanspec, subcarriers):
+    def run(self, H, chanspec, subcarriers, txs=[0, 1, 2, 3]):
 
         bw = chanspec[1]
         if chanspec not in self.chanspec_seen:
@@ -318,10 +318,9 @@ class music_aoa_sensor_1d:
             self.svd_window[chanspec] = np.zeros((self.pkt_window,self.rx_pos.shape[0],self.rx_pos.shape[0]),dtype=np.complex128)
             self.svd_roll[chanspec] = 0
 
-        num_meas = H.shape[1]
 
         c_roll = self.svd_roll[chanspec]
-        for n in range(num_meas):
+        for n in txs:
             self.svd_window[chanspec][c_roll, :, :] = H[subcarriers,:,n].T @ H[subcarriers,:,n].conj()
 
             c_roll += 1
@@ -377,7 +376,7 @@ class aoa_sensor_1d:
 
         return self.theta_space[np.argmax(np.abs(self.Theta[chanspec] @ U_csi))], prof
     
-    def run(self, H, chanspec, subcarriers):
+    def run(self, H, chanspec, subcarriers, txs=[0, 1, 2, 3]):
 
         bw = chanspec[1]
         if chanspec not in self.chanspec_seen:
@@ -390,10 +389,8 @@ class aoa_sensor_1d:
             self.chanspec_seen.add(chanspec)
             self.svd_window[chanspec] = np.zeros((self.pkt_window,self.rx_pos.shape[0],self.rx_pos.shape[0]),dtype=np.complex128)
             self.svd_roll[chanspec] = 0
-
-        num_meas = H.shape[2]
         c_roll = self.svd_roll[chanspec]
-        for n in range(num_meas):
+        for n in txs:
             self.svd_window[chanspec][c_roll, :, :] = H[subcarriers,:,n].T @ H[subcarriers,:,n].conj()
 
             c_roll += 1

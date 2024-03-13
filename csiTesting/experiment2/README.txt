@@ -1,0 +1,3 @@
+In this experiment, I collected CSI data for different angles of arrival. Note that the compensation data used for this experiment is the .npy file in the folder.
+Files are AOA0, AOA+(2, 3), and AOA-(2, 3), for the respective directions. Using the coordinates from experiment 1, the transmitter was a position (-1, 5) and the receiver was at position (-1, 1).
+AOA-2, AOA0, and AOA+ were used to make the graph.

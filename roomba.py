@@ -13,8 +13,8 @@ from std_msgs.msg import Float32MultiArray
 robot = Create3(Bluetooth())
 
 keys_pressed = {keyboard.KeyCode.from_char("w"): False, keyboard.KeyCode.from_char("a"): False, keyboard.KeyCode.from_char("s"): False, keyboard.KeyCode.from_char("d"): False}
-
-# publisher = rospy.Publisher("roomba_pos", String)
+rospy.init_node("TestRoomba")
+publisher = rospy.Publisher("roomba_pos", String)
 
 @event(robot.when_play)
 async def play(robot):
@@ -38,7 +38,7 @@ async def play(robot):
       await robot.set_wheel_speeds(leftSpeed, rightSpeed)
       position = await robot.get_position()
       print(time(), position)
-      # publisher.publish([position.x, position.y, position.heading])
+      publisher.publish([position.x, position.y, position.heading])
 
 
 

@@ -1,3 +1,5 @@
 images/*
 *.pyc
 consolidatedFrames/*
+groundTestVideo.mp4
+groundTestVideo2.mp4

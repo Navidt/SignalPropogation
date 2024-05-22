@@ -304,7 +304,7 @@ class music_aoa_sensor_1d:
         prof = np.reciprocal(np.linalg.norm((self.Theta[chanspec] @ U_csi), axis=1) + eps)**2
         return self.theta_space[np.argmax(prof)], prof
     
-    def run(self, H, chanspec, subcarriers, txs=[0, 1, 2, 3]):
+    def run(self, H, chanspec, subcarriers, txs=[0, 1, 2, 3], rxs=[0, 1, 2, 3]):
 
         bw = chanspec[1]
         if chanspec not in self.chanspec_seen:
@@ -321,7 +321,7 @@ class music_aoa_sensor_1d:
 
         c_roll = self.svd_roll[chanspec]
         for n in txs:
-            self.svd_window[chanspec][c_roll, :, :] = H[subcarriers,:,n].T @ H[subcarriers,:,n].conj()
+            self.svd_window[chanspec][c_roll, :, :] = H[subcarriers,rxs,n].T @ H[subcarriers,rxs,n].conj()
 
             c_roll += 1
             if c_roll >= self.pkt_window:

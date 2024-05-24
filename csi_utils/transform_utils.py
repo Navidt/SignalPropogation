@@ -321,7 +321,8 @@ class music_aoa_sensor_1d:
 
         c_roll = self.svd_roll[chanspec]
         for n in txs:
-            self.svd_window[chanspec][c_roll, :, :] = H[subcarriers,rxs,n].T @ H[subcarriers,rxs,n].conj()
+            # self.svd_window[chanspec][c_roll, :, :] = H[subcarriers,rxs,n].T @ H[subcarriers,rxs,n].conj()
+            self.svd_window[chanspec][c_roll, :, :] = H[subcarriers,:,n].T @ H[subcarriers,:,n].conj()
 
             c_roll += 1
             if c_roll >= self.pkt_window:

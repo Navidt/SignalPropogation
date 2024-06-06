@@ -377,22 +377,31 @@ class aoa_sensor_1d:
 
         return self.theta_space[np.argmax(np.abs(self.Theta[chanspec] @ U_csi))], prof
     
-    def run(self, H, chanspec, subcarriers, txs=[0, 1, 2, 3]):
-
+    def run(self, H, chanspec, subcarriers, txs=[0, 1, 2, 3], rxs=[0, 1, 2, 3]):
+        print("Rxs:", rxs)
         bw = chanspec[1]
         if chanspec not in self.chanspec_seen:
+            print("Rx positions:", self.rx_pos)
+            rx_positions = []
+            for rx in rxs:
+                rx_positions.append(self.rx_pos[rx])
+            rx_positions = np.array(rx_positions)
+            print("New positions:", rx_positions)
             self.Theta[chanspec], _ = fft_mat(
-                self.rx_pos,
+                rx_positions,
                 constants.get_channel_frequencies(chanspec[0],chanspec[1]),
                 self.theta_space,
                 np.asarray([0])
                 )
             self.chanspec_seen.add(chanspec)
-            self.svd_window[chanspec] = np.zeros((self.pkt_window,self.rx_pos.shape[0],self.rx_pos.shape[0]),dtype=np.complex128)
+            num_rx = len(rxs)
+            self.svd_window[chanspec] = np.zeros((self.pkt_window,rx_positions.shape[0],rx_positions.shape[0]),dtype=np.complex128)
             self.svd_roll[chanspec] = 0
         c_roll = self.svd_roll[chanspec]
         for n in txs:
-            self.svd_window[chanspec][c_roll, :, :] = H[subcarriers,:,n].T @ H[subcarriers,:,n].conj()
+            # print(np.shape(H))
+            H_sub = H[subcarriers, :, :]
+            self.svd_window[chanspec][c_roll, :, :] = H_sub[:,rxs,n].T @ H_sub[:,rxs,n].conj()
 
             c_roll += 1
             if(c_roll >= self.pkt_window):

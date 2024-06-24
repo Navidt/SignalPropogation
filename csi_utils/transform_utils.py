@@ -308,28 +308,51 @@ class music_aoa_sensor_1d:
 
         bw = chanspec[1]
         if chanspec not in self.chanspec_seen:
+            rx_positions = []
+            for rx in rxs:
+                rx_positions.append(self.rx_pos[rx])
+            rx_positions = np.array(rx_positions)
+            # print("New positions:", rx_positions)
             self.Theta[chanspec], _ = fft_mat(
-                self.rx_pos,
+                rx_positions,
                 constants.get_channel_frequencies(chanspec[0],chanspec[1]),
                 self.theta_space,
                 np.asarray([0])
                 )
             self.chanspec_seen.add(chanspec)
-            self.svd_window[chanspec] = np.zeros((self.pkt_window,self.rx_pos.shape[0],self.rx_pos.shape[0]),dtype=np.complex128)
+            # self.svd_window[chanspec] = np.zeros((self.pkt_window,rx_positions.shape[0],rx_positions.shape[0]),dtype=np.complex128)
+
+            self.svd_window[chanspec] = np.zeros((self.pkt_window * len(subcarriers),rx_positions.shape[0]),dtype=np.complex128)
             self.svd_roll[chanspec] = 0
 
 
         c_roll = self.svd_roll[chanspec]
         for n in txs:
-            # self.svd_window[chanspec][c_roll, :, :] = H[subcarriers,rxs,n].T @ H[subcarriers,rxs,n].conj()
-            self.svd_window[chanspec][c_roll, :, :] = H[subcarriers,:,n].T @ H[subcarriers,:,n].conj()
+            H_sub = H[subcarriers, :, :]
+            # self.svd_window[chanspec][c_roll, :, :] = H_sub[:,rxs,n].T @ H_sub[:,rxs,n].conj()
+
+            self.svd_window[chanspec][c_roll * len(subcarriers):(c_roll + 1) * len(subcarriers), :] = H_sub[:, rxs, n]
 
             c_roll += 1
             if c_roll >= self.pkt_window:
                 c_roll = 0
         self.svd_roll[chanspec] = c_roll
 
-        U_csi = np.linalg.eig(np.sum(self.svd_window[chanspec], axis=0))[1][:,2:]
+
+        covariance = self.svd_window[chanspec].T @ self.svd_window[chanspec].conj()
+
+        eigenvalues, eigenvecs = np.linalg.eig(covariance)
+
+        # TODO: Instead of summing covariance matrices, construct data matrix out of all measurements and then compute the covariance matrix
+        # eigenvalues, eigenvecs = np.linalg.eig(np.sum(self.svd_window[chanspec], axis=0))
+
+        # for some reson the original algorithm didn't sort the eigenvalues (???), so we do it here
+        sorted = np.argsort(eigenvalues)[::-1]
+        eigenvalues = eigenvalues[sorted]
+        eigenvecs = eigenvecs[:,sorted]
+        U_csi = eigenvecs[:,3:]
+        # print("Eigenvalies:", eigenvalues)
+        # U_csi = np.linalg.eig(np.sum(self.svd_window[chanspec], axis=0))[1][:,1:]
 
         prof = np.reciprocal(np.linalg.norm((self.Theta[chanspec] @ U_csi), axis=1) + eps)**2
         return self.theta_space[np.argmax(prof)], prof
@@ -378,7 +401,7 @@ class aoa_sensor_1d:
         return self.theta_space[np.argmax(np.abs(self.Theta[chanspec] @ U_csi))], prof
     
     def run(self, H, chanspec, subcarriers, txs=[0, 1, 2, 3], rxs=[0, 1, 2, 3]):
-        print("Rxs:", rxs)
+        # print("Rxs:", rxs)
         bw = chanspec[1]
         if chanspec not in self.chanspec_seen:
             print("Rx positions:", self.rx_pos)
@@ -386,7 +409,7 @@ class aoa_sensor_1d:
             for rx in rxs:
                 rx_positions.append(self.rx_pos[rx])
             rx_positions = np.array(rx_positions)
-            print("New positions:", rx_positions)
+            # print("New positions:", rx_positions)
             self.Theta[chanspec], _ = fft_mat(
                 rx_positions,
                 constants.get_channel_frequencies(chanspec[0],chanspec[1]),

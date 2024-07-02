@@ -1,0 +1,5 @@
+Post Lab Assignment-4: Write in a few sentences what you liked about this lab and what you didn’t like about this lab.
+
+We liked that we could display our walking path and see the RSSI changes in real-time. Additionally, we enjoyed the challenge of trying to figure out how to come up with a sufficient window to compute the moving average and get a smoother curve. We also got good assistance from the TAs and classmates in the lab to discuss.
+
+We didn't like working with async and await functions, as we had to spend lots of time debugging to support global variables. We ended up needing to use global variables. However, we feel this can be dangerous due to possible race conditions.

@@ -1,0 +1,2 @@
+sshpass -p isens ssh -o strictHostKeyChecking=no isens@192.168.43.1 /jffs/csi/nexutil -Ieth6 -s504 -i -v1
+sshpass -p isens ssh -o strictHostKeyChecking=no isens@192.168.43.1 /jffs/csi/send.sh 157 20 4 11:11:11:4c:41:0f > /dev/null 2>&1

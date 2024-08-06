@@ -2,6 +2,36 @@ import csi_utils.synthetic_channel as synthetic_channel
 import csi_utils.constants as constants
 import numpy as np
 
+
+def generic_music(covarianceMatrix, steeringVectors, numPaths=2):
+    """
+    Perform the MUSIC algorithm on the given covariance matrix and steering vectors
+    :param covarianceMatrix: Covariance matrix
+    :param steeringVectors: Steering vectors
+    :return: Spectrum
+    """
+    # Compute the noise subspace
+    covarianceMatrix = np.array(covarianceMatrix)
+    steeringVectors = np.array(steeringVectors)
+    eigenvalues, eigenvecs = np.linalg.eigh(covarianceMatrix)
+
+    eigenvalues = eigenvalues[::-1]
+    eigenvecs = eigenvecs[:,::-1]
+
+    # print("Eigenvalues:", eigenvalues)
+
+    # signal_space = eigenvecs[:,:numPaths]
+    noiseSpace = eigenvecs[:,numPaths:]
+    # Compute the MUSIC spectrum
+
+    eHU  = steeringVectors @ noiseSpace.conj()
+
+    
+    music_spectrum = np.linalg.norm(eHU, axis=1)
+
+    # print("Spectrum shape:", np.shape(music_spectrum))
+    return 1 / music_spectrum
+
 class full_music_aoa_aod_sensor():
   def __init__(self, rx_pos, tx_pos, theta_space, phi_space, pkt_window=40):
     self.rx_pos = rx_pos
@@ -42,40 +72,11 @@ class full_music_aoa_aod_sensor():
     H = H[subcarriers, :, :]
     H = H[:,rxs,:]
     self.svd_window[chanspec][c_roll * len(subcarriers):(c_roll + 1) * len(subcarriers), :] = H[:, :, txs].reshape(len(subcarriers), -1)
-    # self.svd_window[chanspec][c_roll * len(subcarriers):(c_roll + 1) * len(subcarriers), :] = H.reshape(len(subcarriers), -1)
 
     c_roll += 1
     if c_roll >= self.pkt_window:
       c_roll = 0
     self.svd_roll[chanspec] = c_roll
 
-    # print("SVD window shape:", np.shape(self.svd_window[chanspec]))
-
     covariance = self.svd_window[chanspec].T @ self.svd_window[chanspec].conj()
-    eigenvalues, eigenvecs = np.linalg.eigh(covariance)
-
-    eigenvalues = eigenvalues[::-1]
-    eigenvecs = eigenvecs[:,::-1]
-
-    print("Eigenvalues:", eigenvalues)
-
-    signal_space = eigenvecs[:,:numPaths]
-    noise_space = eigenvecs[:,numPaths:]
-
-    # print("Noise shape:", np.shape(noise_space))
-    # print("Steering shape:", np.shape(self.steering_matrices[chanspec]))
-
-    eHU  = self.steering_matrices[chanspec] @ noise_space.conj()
-
-    if normSq:
-      music_spectrum = (eHU[:, np.newaxis, :] @ eHU[:, :, np.newaxis].conj()).real
-    else:
-      music_spectrum = np.linalg.norm(eHU, axis=1)
-
-    if calculateStrength:
-      weighted_signal_space = signal_space * eigenvalues[:numPaths]
-      eSU  = self.steering_matrices[chanspec] @ weighted_signal_space.conj()
-      music_spectrum /= np.linalg.norm(eSU, axis=1)
-
-    # print("Spectrum shape:", np.shape(music_spectrum))
-    return 1 / music_spectrum.reshape(len(self.theta_space), len(self.phi_space))
+    return generic_music(covariance, self.steering_matrices[chanspec], numPaths).reshape(len(self.theta_space), len(self.phi_space))

@@ -1,0 +1,1 @@
+sshpass -p isens ssh -o strictHostKeyChecking=no isens@192.168.43.1 killall send.sh

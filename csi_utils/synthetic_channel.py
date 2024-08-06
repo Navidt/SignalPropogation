@@ -28,7 +28,7 @@ def aoa_aod_steering_matrix(aoa: float, aod: float, rx_positions: list[tuple[flo
 
     return steering_vector_rx @ steering_vector_tx
 
-def create_channel(num_rx: int, num_tx: int, paths: list[tuple[float, float, float]], frequencies: list[float], rx_positions=None, tx_positions=None, tof=None, noiseStrength=0, degrees=False):
+def create_channel(num_rx: int, num_tx: int, paths: list[tuple[float, float, float]], frequencies: list[float], rx_positions=None, tx_positions=None, tof=None, noiseStrength=0, degrees=False, correlation=None):
   """
   Create a synthetic channel matrix based on the given AoAs and AoDs
   :param num_rx: Number of receive antennas
@@ -40,17 +40,20 @@ def create_channel(num_rx: int, num_tx: int, paths: list[tuple[float, float, flo
   :param tof: Add time of flight to the channel matrix; Default: None
   :param noiseStrength: Noise strength; Default: 0
   :param degrees: If True, convert angles to radians
+  :param correlation: If none, signals are not correlated. Otherwise, a list of weights applied to each signal
   :return: Channel matrix
   """
   channelMatrix = np.zeros((len(frequencies), num_rx, num_tx), dtype=complex)
   frequencies = np.array(frequencies)
   wavelength = constants.c / frequencies[len(frequencies) // 2]
+  print(wavelength)
   if rx_positions is None:
     rx_positions = np.array([(i * wavelength / 2, 0) for i in range(num_rx)])
   if tx_positions is None:
     tx_positions = np.array([(i * wavelength / 2, 0) for i in range(num_tx)])
 
   for aoa, aod, strength in paths:
+    subcarrierWeights = (2 + 5 * np.random.random((len(frequencies), 1, 1))) * np.exp(1j * 2 * np.pi * np.random.random((len(frequencies), 1, 1)))
     if degrees:
       aoa = np.deg2rad(aoa)
       aod = np.deg2rad(aod)
@@ -59,7 +62,13 @@ def create_channel(num_rx: int, num_tx: int, paths: list[tuple[float, float, flo
     if tof is not None:
       channelMatrix += strength * steering_matrix * np.exp(1j * 2 * np.pi * tof * frequencies)
     else:
-      channelMatrix += strength * steering_matrix * (2 + 5 * np.random.random((len(frequencies), 1, 1)))
+      # if correlation is not None:
+      #   steering_matrix = steering_matrix * correlation
+      channelMatrix += strength * steering_matrix * subcarrierWeights
+      
+      # channelMatrix += strength * steering_matrix
+    
+      
 
   if noiseStrength > 0:
     channelMatrix += np.random.normal(0, noiseStrength, channelMatrix.shape) + 1j * np.random.normal(0, noiseStrength, channelMatrix.shape)

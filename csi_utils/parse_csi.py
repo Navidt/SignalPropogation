@@ -72,7 +72,6 @@ def read_bf_file(filename):
                     tmp = bytes([(payload[index // 8] >> remainder) |
                                  (payload[index // 8 + 1] << (8 - remainder)) & 0xFF])
                     R = float(int.from_bytes(tmp, byteorder='little', signed=True))
-
                     tmp = bytes([(payload[index // 8 + 1] >> remainder) |
                                  (payload[index // 8 + 2] << (8 - remainder)) & 0xFF])
                     I = float(int.from_bytes(tmp, byteorder='little', signed=True))

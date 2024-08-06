@@ -106,59 +106,6 @@ def unit_magnitude_vectors_in_subspace_new(subspace: np.ndarray, granularity: in
 
   return 1 / results, vectors
 
-  
-
-def unit_magnitude_vectors_in_subspace(subspace: np.ndarray, a_search_space: np.ndarray = None, theta_search_space: np.ndarray = None):
-  # subspace_dimension = subspace.shape[0]
-  num_vectors = subspace.shape[1]
-  print("Num vectors:", num_vectors)
-  if num_vectors != 2:
-    raise ValueError("Only works for 2 vectors right now")
-  # search the projection of the subspace onto the unit circle
-  if a_search_space is None:
-    a_search_space = np.linspace(0, np.pi / 2, 200)
-  if theta_search_space is None:
-    theta_search_space = np.linspace(0, 2 * np.pi, 200)
-  results = np.zeros((len(a_search_space), len(theta_search_space)))
-  vectors = np.zeros((len(a_search_space), len(theta_search_space), subspace.shape[0]), dtype=np.complex128)
-  for i, a in enumerate(a_search_space):
-    for j, theta in enumerate(theta_search_space):
-      # r = np.sqrt(1 - a * a)
-      c1 = np.cos(a)
-      c2 = np.sin(a) * np.exp(1j * theta)
-      vector = c1 * subspace[:, 0] + c2 * subspace[:, 1]
-      # print("Vector norm (should be 1):", np.linalg.norm(vector))
-      magnidutes = np.abs(vector)
-      avg = np.average(magnidutes)
-      results[i, j] = 1 - subspace.shape[0] * avg * avg
-      vectors[i, j] = vector
-      # results[i, j] = np.std(magnidutes)
-  return 1 / results, vectors
-
-class PartitionIterator:
-  def __init__(self, n, k):
-    self.partition = [k] + [0] * (n - 1)
-    self.k = k
-    self.transferIndex = 0
-
-  def __iter__(self):
-    return self
-  
-  def __next__(self):
-    if self.partition[-1] == self.k:
-      raise StopIteration
-    self.partition[self.transferIndex] -= 1
-    endValue = self.partition[-1]
-    self.partition[-1] = 0
-    self.partition[self.transferIndex + 1] = endValue + 1
-    self.transferIndex += 1
-    if self.transferIndex == len(self.partition) - 1:
-      for i in range(len(self.partition) - 2, -1, -1):
-        if self.partition[i] != 0:
-          self.transferIndex = i
-          break
-    return self.partition
-
 
 class AdjacentIterator:
   def __init__(self, dimension, radius):
@@ -178,35 +125,6 @@ class AdjacentIterator:
         return self.indices
       self.indices[i] = -self.radius
     raise StopIteration
-
-def next_partition(partition: list[int], n: int):
-  """
-  Generate the next partition of n
-  :param partition: Current partition
-  :param n: Number to partition
-  :return: Next partition
-  """
-  if partition[-1] == n:
-    return None
-  for i in range(len(partition) - 2, -1, -1):
-    if partition[i] == 0:
-      continue
-    partition[i] -= 1
-    endValue = partition[-1]
-    partition[-1] = 0
-    partition[i + 1] = endValue + 1
-    break
-  return partition
-
-def generate_partitions_recursive(n, k, partition=None):
-  partition = [k] + [0] * (n - 1)
-  partitions = [partition]
-  while True:
-    partition = next_partition(partition, k)
-    if partition is None:
-      break
-    partitions.append(partition.copy())
-  return partitions
 
 def local_maxima(matrix: np.ndarray, threshold: float = 0.0, radius: int = 1, search_indices: np.ndarray = None):
   """
@@ -283,123 +201,60 @@ def steering_vector_correlation(transformedVectors: list[np.ndarray], steeringVe
   return profile
 
 
-# THIS DOESN'T WORK; THERE IS NO REASON THAT THE COMPENSATION SUBSPACES HAVE TO BE THE SAME -- THEY MUST ONLY
-# AGREE ON THE SINGLE VECTOR
-def calculate_compensation_correlation(covariance_matrix: np.ndarray, steering_vectors: np.ndarray, numPaths = 2):
+def calculate_compensation_correlation(covarianceMatrix: np.ndarray, steeringVectors: np.ndarray, numPaths = 2):
   """
   Calculate the compensation correlation matrix
   :param covariance_matrix: Covariance matrix of the channel
   :param steering_vectors: Steering vectors of the channel
   :return: Compensation correlation matrix
   """
-  eigenvalues, eigenvecs = np.linalg.eigh(covariance_matrix)
+  eigenvalues, eigenvecs = np.linalg.eigh(covarianceMatrix)
 
   eigenvalues = eigenvalues[::-1]
   eigenvecs = eigenvecs[:,::-1]
 
-  signal_space = eigenvecs[:, :numPaths]
-  product_signal_space = signal_space / signal_space[:, 0][:, np.newaxis]
-  # product_signal_basis = np.linalg.orth(product_signal_space)
-
-  signal_dimension = len(steering_vectors[0])
-
-  # steering_subspaces = np.zeros((len(steering_vectors), signal_dimension, numPaths), dtype=np.complex128)
-
-  # a subspace for the possible compensation vectors of each steering vector. The first numPaths columns are the basis of the subspace
-  # the rest of the columns are the basis of the orthogonal complement of the subspace. All orthonormal.
-  steering_subspaces = np.zeros((len(steering_vectors), signal_dimension, signal_dimension), dtype=np.complex128)
+  signalSpace = eigenvecs[:, :numPaths]
 
 
-  # matrix_basis = np.identity(numPaths * signal_dimension).reshape(-1, numPaths, signal_dimension)
+  signal_dimension = len(steeringVectors[0])
 
-  sum_squares = signal_dimension * signal_dimension - 2 * numPaths * (signal_dimension - numPaths)
+  compensation_correlation = np.zeros((len(steeringVectors), len(steeringVectors)))
+  unit_correlation = np.zeros((len(steeringVectors), len(steeringVectors)))
+  distance_correlation = np.zeros((len(steeringVectors), len(steeringVectors)))
 
-  matrix_basis = np.zeros((sum_squares, signal_dimension, signal_dimension))
-  k = 0
-  for i in range(numPaths):
-    for j in range(numPaths):
-      matrix_basis[k][i, j] = 1
-      k += 1
-  
-  for i in range(numPaths, signal_dimension):
-    for j in range(numPaths, signal_dimension):
-      matrix_basis[k][i, j] = 1
-      k += 1
+  matrixTemplate = np.zeros((signal_dimension, 2 * numPaths - 1), dtype=complex)
+
+  matrixTemplate[:, :numPaths - 1] = -signalSpace[:, 1:numPaths]
+  matrixTemplate[:, numPaths - 1:] = signalSpace
+
+  # print(matrixTemplate)
+
+  for i in range(len(steeringVectors)):
+    for j in range(len(steeringVectors)):
+      if abs(i -j) < 5:
+        compensation_correlation[i, j] = 0.1
+        continue
+      steeringVectorRatio = (steeringVectors[i] / steeringVectors[i][0]) / (steeringVectors[j] / steeringVectors[j][0])
+      
+      A = matrixTemplate.copy()
+      A[:, numPaths - 1:] *= steeringVectorRatio[:, np.newaxis]
+      solution = np.linalg.lstsq(A, signalSpace[:, 0], rcond=None)
+
+      vector = A @ solution[0]
+
+      compensation_correlation[i, j] = (np.linalg.norm(vector - signalSpace[:, 0]))
+      distance_correlation[i, j] = 1 / compensation_correlation[i, j]
+
+      candidateVec1 = signalSpace[:, 1:] @ solution[0][:numPaths - 1] + signalSpace[:, 0]
+      candidateVec2 = signalSpace @ solution[0][numPaths - 1:]
+
+      candidateVec1 /= candidateVec1[0]
+      candidateVec2 /= candidateVec2[0]
+      standardDeviation = np.std(np.abs(candidateVec1)) + np.std(np.abs(candidateVec2))
+      unit_correlation[i, j] = 1 / standardDeviation
+      compensation_correlation[i, j] += standardDeviation
+      compensation_correlation[i, j] = 1 / compensation_correlation[i, j]
 
 
-  # stores an orthonormal basis for the (flattened) matrices that preserve the subspace of a steering vector
-  transformation_matrix_subspaces = np.zeros((len(steering_vectors), signal_dimension * signal_dimension, sum_squares), dtype=np.complex128)
-
-  for i in range(len(steering_vectors)):
-    # just the vectors spanning the subspace of the compensation vectors
-    print("signal space shape:", signal_space.shape)
-    print("steering vector shape:", steering_vectors[i].shape)
-    steering_subspace_sparse = (signal_space.T / steering_vectors[i]).T
-
-    eigenvalues, eigenvecs = np.linalg.eigh(steering_subspace_sparse @ steering_subspace_sparse.conj().T)
-    eigenvecs = eigenvecs[:, ::-1]
-    # print("Eigenvalues:", eigenvalues)
-
-    # steering_subspaces[i] = orth((signal_space.T / steering_vectors[i]).T)
-    steering_subspaces[i] = eigenvecs
-
-
-    # matrix_subspace = (steering_subspaces[i] @ matrix_basis @ steering_subspaces[i].conj().T).reshape(numPaths * numPaths, -1).T
-
-    # print("Matrix basis shape:", matrix_basis.shape)
-    # print("Steering subspace shape:", steering_subspaces[i].shape)
-
-    matrix_subspace = (steering_subspaces[i] @ matrix_basis @ steering_subspaces[i].conj().T).reshape(-1, signal_dimension * signal_dimension).T
-
-    # print("Matrix subspace shape:", matrix_subspace.shape)
-
-    transformation_matrix_subspaces[i] = orth(matrix_subspace)
-
-  output_distances = np.zeros((len(steering_vectors), len(steering_vectors)))
-
-  for i in range(len(steering_vectors)):
-    for j in range(len(steering_vectors)):
-      # if abs(i - j) == 0:
-      #   output_distances[i, j] = 0
-      #   continue
-
-      intersection = subspace_intersection(steering_subspaces[i][:, :numPaths], steering_subspaces[j][:, :numPaths])
-      # print("Intersection:", intersection)
-      for i in range(intersection.shape[1]):
-        vector = intersection[:, i]
-        # project the vector onto both subspaces
-        # print("Vector:", vector)
-        print("Magnitude:", np.linalg.norm(vector))
-        projection_i = steering_subspaces[i] @ steering_subspaces[i].conj().T @ vector
-        projection_j = steering_subspaces[j] @ steering_subspaces[j].conj().T @ vector
-        difference_i = vector - projection_i
-        difference_j = vector - projection_j
-        print("Difference i:", np.linalg.norm(difference_i))
-        print("Difference j:", np.linalg.norm(difference_j))
-      print("Dot product:", intersection.conj().T @ intersection)
-      # this doesn't work because they only have to agree on one compensation value, not the whole subspace
-      # angles = principal_angle(steering_subspaces[i][:, :numPaths], steering_subspaces[j][:, :numPaths])
-      # output_distances[i, j] = 1 / np.linalg.norm(angles)
-      continue
-      difference = np.diag(steering_vectors[i] / steering_vectors[j]).flatten()
-      print("Difference:", difference)
-
-      # print("Difference:", difference.shape)
-      # print("Transformation:", transformation_matrix_subspaces[j].shape)
-
-      # project the difference and turn it back into our coordinates
-
-      # tm = transformation_matrix_subspaces[j]
-      # middleMatrix = np.linalg.inv(tm.conj().T @ tm)
-      # print("Middle matrix:", middleMatrix)
-      # difference_projection = tm @ middleMatrix @ tm.conj().T @ difference
-      difference_projection = transformation_matrix_subspaces[j] @ transformation_matrix_subspaces[j].conj().T @ difference
-
-      if i == j:
-        print("Difference:", difference)
-        print("Difference projection:", difference_projection)
-      # get the magnitude of the difference between the two matrices
-      output_distances[i, j] = np.linalg.norm(difference - difference_projection)
-      print("Distance:", output_distances[i, j])
-
-  return output_distances
+  # print("Distance correlation:", distance_correlation.shape)
+  return compensation_correlation, unit_correlation, distance_correlation

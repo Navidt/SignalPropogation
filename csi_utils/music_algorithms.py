@@ -3,34 +3,120 @@ import csi_utils.constants as constants
 import numpy as np
 
 
-def generic_music(covarianceMatrix, steeringVectors, numPaths=2):
-    """
-    Perform the MUSIC algorithm on the given covariance matrix and steering vectors
-    :param covarianceMatrix: Covariance matrix
-    :param steeringVectors: Steering vectors
-    :return: Spectrum
-    """
-    # Compute the noise subspace
-    covarianceMatrix = np.array(covarianceMatrix)
-    steeringVectors = np.array(steeringVectors)
-    eigenvalues, eigenvecs = np.linalg.eigh(covarianceMatrix)
+def generic_music(covarianceMatrix, steeringVectors, numPaths=2, calculateStrength=False):
+  """
+  Perform the MUSIC algorithm on the given covariance matrix and steering vectors
+  :param covarianceMatrix: Covariance matrix
+  :param steeringVectors: Steering vectors
+  :return: Spectrum
+  """
+  # Compute the noise subspace
+  covarianceMatrix = np.array(covarianceMatrix)
+  steeringVectors = np.array(steeringVectors)
+  eigenvalues, eigenvecs = np.linalg.eigh(covarianceMatrix)
 
-    eigenvalues = eigenvalues[::-1]
-    eigenvecs = eigenvecs[:,::-1]
+  eigenvalues = eigenvalues[::-1]
+  eigenvecs = eigenvecs[:,::-1]
 
-    # print("Eigenvalues:", eigenvalues)
+  # print("Eigenvalues:", eigenvalues)
 
-    # signal_space = eigenvecs[:,:numPaths]
-    noiseSpace = eigenvecs[:,numPaths:]
-    # Compute the MUSIC spectrum
+  signalSpace = eigenvecs[:,:numPaths]
+  noiseSpace = eigenvecs[:,numPaths:]
+  # Compute the MUSIC spectrum
 
-    eHU  = steeringVectors @ noiseSpace.conj()
+  eHU  = steeringVectors @ noiseSpace.conj()
 
+  
+  music_spectrum = np.linalg.norm(eHU, axis=1)
+
+  if calculateStrength:
+    weighted_signal_space = signalSpace * eigenvalues[:numPaths]
+    eSU  = steeringVectors @ weighted_signal_space.conj()
+    music_spectrum /= np.linalg.norm(eSU, axis=1)
+
+  # print("Spectrum shape:", np.shape(music_spectrum))
+  return 1 / music_spectrum
+
+class MusicResults:
+  def __init__(self, matrix, thetaRange, phiRange):
+    self.matrix = matrix
+    self.thetaRange = thetaRange
+    self.phiRange = phiRange
+    self.maxima = {} # dictionary from indices to the finer results at that index
+    self.depth = 0
+  def add_maximum(self, i, j, finerResults):
+    self.maxima[(i, j)] = finerResults
+    self.depth = max(self.depth, finerResults.depth + 1)
+
+  def levelOneIdx(self, i, j):
+    coarseI = i // np.shape(self.matrix)[0]
+    coarseJ = j // np.shape(self.matrix)[1]
+    if (coarseI, coarseJ) in self.maxima:
+      return self.maxima[(coarseI, coarseJ)].matrix[i % np.shape(self.matrix)[0], j % np.shape(self.matrix)[1]]
+    else:
+      return self.matrix[coarseI, coarseJ]
+
+  def renderIntoImg(self):
+    image = np.zeros((np.shape(self.matrix)[0]**2, np.shape(self.matrix)[1]**2))
+    print("Image shape:", np.shape(image))
+    for i in range(np.shape(image)[0]):
+      for j in range(np.shape(image)[1]):
+        image[i, j] = self.levelOneIdx(i, j)
+    return image
+
+
+
+
+def generic_music_fast(covarianceMatrix, steeringVectorFunction, numPaths=2, granularity=10, thetaRange=[0, 180], phiRange=[0, 180], calculateStrength=False, depth=2, showChosen=False):
+  """
+  steeringVectorFunction should take in two angles and return a steering vector
+  thetaRange and phiRange are the ranges of angles to consider
+  granularity is the number of points to consider in each range
+  """
+  steeringVectors = np.zeros((granularity * granularity, np.shape(covarianceMatrix)[0]), dtype=np.complex128)
+  for i in range(granularity):
+    for j in range(granularity):
+      theta = thetaRange[0] + (thetaRange[1] - thetaRange[0]) * i / granularity
+      phi = phiRange[0] + (phiRange[1] - phiRange[0]) * j / granularity
+      steeringVector = steeringVectorFunction(theta, phi)
+      steeringVectors[i * granularity + j] = steeringVector
+  matrix = generic_music(covarianceMatrix, steeringVectors, numPaths, calculateStrength).reshape(granularity, granularity)
+  # Find the local maxima in the results and try again
+  # get indices of top 3 maxima in results
+  top = 5
+  maxima = np.argpartition(matrix.flatten(), -top)[-top:]
+  # maxima = [np.argmax(matrix)]
+  
+  results = MusicResults(matrix, thetaRange, phiRange)
+  # return results
+  if (depth == 0):
+    return results
+  for maximum in maxima:
+    maxi = maximum // granularity
+    maxj = maximum % granularity
+    for offsets in [(0, 0), (1, 0), (0, 1), (0, -1), (-1, 0)]:
+      i = maxi + offsets[0]
+      j = maxj + offsets[1]
+      # get the indices of the maximum in the 2D array
+      
+      # get the angles corresponding to the maximum
+      startTheta = thetaRange[0] + (thetaRange[1] - thetaRange[0]) * i / granularity
+      startPhi = phiRange[0] + (phiRange[1] - phiRange[0]) * j / granularity
+      endTheta = thetaRange[0] + (thetaRange[1] - thetaRange[0]) * (i + 1) / granularity
+      endPhi = phiRange[0] + (phiRange[1] - phiRange[0]) * (j + 1) / granularity
+      newResults = generic_music_fast(covarianceMatrix, steeringVectorFunction, numPaths, granularity, [startTheta, endTheta], [startPhi, endPhi], calculateStrength, depth - 1)
+      if showChosen:
+        newResults.matrix += 0.2
+      results.add_maximum(i, j, newResults)
     
-    music_spectrum = np.linalg.norm(eHU, axis=1)
 
-    # print("Spectrum shape:", np.shape(music_spectrum))
-    return 1 / music_spectrum
+    # get the steering vector at the maximum
+    # steeringVector = steeringVectorFunction(theta, phi)
+    # steeringVectors[maximum] = steeringVector
+  print("Maxima:", maxima)
+  return results
+
+# def maximum_sampler()
 
 class full_music_aoa_aod_sensor():
   def __init__(self, rx_pos, tx_pos, theta_space, phi_space, pkt_window=40):
@@ -79,4 +165,4 @@ class full_music_aoa_aod_sensor():
     self.svd_roll[chanspec] = c_roll
 
     covariance = self.svd_window[chanspec].T @ self.svd_window[chanspec].conj()
-    return generic_music(covariance, self.steering_matrices[chanspec], numPaths).reshape(len(self.theta_space), len(self.phi_space))
+    return generic_music(covariance, self.steering_matrices[chanspec], numPaths, calculateStrength=calculateStrength).reshape(len(self.theta_space), len(self.phi_space))

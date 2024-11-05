@@ -11,8 +11,8 @@ keys_pressed = {keyboard.KeyCode.from_char("w"): False, keyboard.KeyCode.from_ch
 
 @event(robot.when_play)
 async def play(robot):
-  turnSpeed = 16
-  moveSpeed = 20
+  turnSpeed = 8
+  moveSpeed = 10
   while(1):
       leftSpeed = 0
       rightSpeed = 0

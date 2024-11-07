@@ -36,22 +36,6 @@ class ModelRayTrace:
         for (i, idx) in enumerate(self.materialIdx):
             self.faceIdxToMaterial[prev:idx] = i
             prev = idx
-        # for i in range(len(self.materials)):
-        #     filename = self.filenames[i]
-        #     p = os.path.join(filepath, filename)
-        #     newgeometry = trimesh.load(p, force="mesh")
-        #     print("Trying material", i)
-        #     for j in range(len(self.combinedMesh.faces)):
-        #         if (self.faceIdxToMaterial[j] == -1):
-        #             for k in range(len(newgeometry.faces)):
-        #                 if (np.array_equal(self.combinedMesh.face_normals[j], newgeometry.face_normals[k])):
-        #                     self.faceIdxToMaterial[j] = i
-        #                     # print("Setting index", j, "to", i)
-        #                     break
-        #             if (self.faceIdxToMaterial[j] == -1):
-        #                 print("Failed to find face for index", j, "with material", i)
-
-
         self.rays = self.combinedMesh.ray
 
     def RayTrace(self, origins, directions, other=False):
